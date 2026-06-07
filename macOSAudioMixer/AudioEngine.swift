@@ -222,6 +222,7 @@ private class InputChannel {
     private let monitorPlayer = AVAudioPlayerNode()
     
     private var converter: AVAudioConverter?
+
     
     // References
     private unowned let masterEngine: AVAudioEngine
@@ -252,6 +253,7 @@ private class InputChannel {
         
         // 3. Setup Input Hardware
         let inputNode = inputEngine.inputNode
+        inputEngine.disconnectNodeOutput(inputNode) // Disconnect direct loopback output of the capture engine to prevent echo
         let inputAudioUnit = inputNode.audioUnit!
         var inputDeviceID = device.id
         let status = AudioUnitSetProperty(

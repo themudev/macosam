@@ -23,24 +23,39 @@ class DeviceManager: ObservableObject {
     // Published properties that SwiftUI views will bind to
     @Published var inputDevices: [AudioDevice] = []
     @Published var outputDevices: [AudioDevice] = []
+    @Published var isLoading: Bool = false
     
     init() {
         // 2. Start listening for device changes (hot-plugging)
         setupDeviceListener()
         
-        // FIX: Defer the initial device scan to allow Core Audio to stabilize
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-            self.loadDevices()
-        }
+        // Load devices immediately, loadDevices() will schedule it asynchronously
+        self.loadDevices()
     }
     
     // MARK: - Device Query
     
     // Public function to refresh the lists
     func loadDevices() {
-        inputDevices = getDevices(isInput: true)
-        outputDevices = getDevices(isInput: false)
-        print("DeviceManager: Loaded \(inputDevices.count) inputs and \(outputDevices.count) outputs.")
+        // Ensure we set loading state on the main thread
+        DispatchQueue.main.async {
+            self.isLoading = true
+        }
+        
+        // Query Core Audio on a background thread
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            guard let self = self else { return }
+            let inputs = self.getDevices(isInput: true)
+            let outputs = self.getDevices(isInput: false)
+            
+            // Publish the new devices and clear loading on the main thread
+            DispatchQueue.main.async {
+                self.inputDevices = inputs
+                self.outputDevices = outputs
+                self.isLoading = false
+                print("DeviceManager: Loaded \(inputs.count) inputs and \(outputs.count) outputs asynchronously.")
+            }
+        }
     }
     
     /**

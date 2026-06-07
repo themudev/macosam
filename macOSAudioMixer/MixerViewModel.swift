@@ -28,28 +28,29 @@ class MixerViewModel: ObservableObject {
     @Published var audioEngine = AudioEngine()
     
     // Track selected devices
-    @Published var selectedInputDevices: Set<AudioDevice> = [] { didSet { saveState() } }
+    @Published var selectedInputDevices: Set<AudioDevice> = [] { didSet { saveStateDebounced() } }
     
     // Track Volume Levels (Key: AudioObjectID, Value: 0.0 to 1.0)
-    @Published var inputVolumes: [AudioObjectID: Float] = [:] { didSet { saveState() } }
+    @Published var inputVolumes: [AudioObjectID: Float] = [:] { didSet { saveStateDebounced() } }
     // Track Mute State (Key: AudioObjectID, Value: Bool)
-    @Published var inputMuted: [AudioObjectID: Bool] = [:] { didSet { saveState() } }
+    @Published var inputMuted: [AudioObjectID: Bool] = [:] { didSet { saveStateDebounced() } }
     
     // Output Volumes & Mute
-    @Published var masterVolume: Float = 0.25 { didSet { saveState() } }
-    @Published var isMasterMuted: Bool = false { didSet { saveState() } }
+    @Published var masterVolume: Float = 0.25 { didSet { saveStateDebounced() } }
+    @Published var isMasterMuted: Bool = false { didSet { saveStateDebounced() } }
     
-    @Published var monitorVolume: Float = 0.25 { didSet { saveState() } }
-    @Published var isMonitorMuted: Bool = false { didSet { saveState() } }
+    @Published var monitorVolume: Float = 0.25 { didSet { saveStateDebounced() } }
+    @Published var isMonitorMuted: Bool = false { didSet { saveStateDebounced() } }
     
     // Output Devices
-    @Published var selectedOutputDevice: AudioDevice? { didSet { saveState() } }
-    @Published var selectedMonitorDevice: AudioDevice? { didSet { saveState() } }
+    @Published var selectedOutputDevice: AudioDevice? { didSet { saveStateDebounced() } }
+    @Published var selectedMonitorDevice: AudioDevice? { didSet { saveStateDebounced() } }
     
     // Settings Reference
     let settings = AppSettings.shared
     
     private var cancellables = Set<AnyCancellable>()
+    private var saveWorkItem: DispatchWorkItem?
 
     init() {
         // Initialize AudioEngine with current settings
@@ -274,6 +275,15 @@ class MixerViewModel: ObservableObject {
         defaults.set(isMasterMuted, forKey: Keys.isMasterMutedKey)
         defaults.set(monitorVolume, forKey: Keys.monitorVolumeKey)
         defaults.set(isMonitorMuted, forKey: Keys.isMonitorMutedKey)
+    }
+    
+    private func saveStateDebounced() {
+        saveWorkItem?.cancel()
+        let workItem = DispatchWorkItem { [weak self] in
+            self?.saveState()
+        }
+        saveWorkItem = workItem
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3, execute: workItem)
     }
     
     private func restoreState() {
